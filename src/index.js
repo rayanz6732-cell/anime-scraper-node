@@ -32,8 +32,29 @@ app.get('/', (_req, res) => {
       'GET /episodes/gogo/:animeId': 'Episodes from Gogoanime',
       'GET /stream/animepahe/:animeSession/:episodeSession': 'Streams from Animepahe',
       'GET /stream/gogo?id=:episodeId': 'Streams from Gogoanime',
+      'GET /debug?url=<url>': 'Debug HTML structure of any page',
     },
   });
+});
+
+app.get('/debug', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'url param required' });
+  const { getPage } = require('./browser');
+  const page = await getPage();
+  try {
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    const title = await page.title();
+    const html = await page.content();
+    const classes = await page.evaluate(() => {
+      return [...new Set([...document.querySelectorAll('[class]')].flatMap(el => [...el.classList]))].slice(0, 60);
+    });
+    res.json({ url, title, classes, htmlPreview: html.slice(0, 3000) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await page.close();
+  }
 });
 
 app.get('/search', async (req, res) => {
